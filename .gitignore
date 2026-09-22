@@ -1,0 +1,23 @@
+# Data
+data/*.csv
+data/*.xlsx
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Models & results
+results/*.pkl
+results/*.joblib
+*.h5
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/
