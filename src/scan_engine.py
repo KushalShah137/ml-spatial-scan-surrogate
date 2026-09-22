@@ -4,9 +4,15 @@ Implements Kulldorff's circular spatial scan statistic using k-NN candidate wind
 """
 
 from pathlib import Path
+import sys
 import numpy as np
 import pandas as pd
 from scipy.spatial.distance import cdist
+
+# Add repo root to sys.path if running as a standalone script
+repo_root = Path(__file__).resolve().parent.parent
+if str(repo_root) not in sys.path:
+    sys.path.insert(0, str(repo_root))
 
 
 def haversine_distance_matrix(latitudes: np.ndarray, longitudes: np.ndarray) -> np.ndarray:
