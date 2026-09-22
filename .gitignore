@@ -14,7 +14,11 @@ venv/
 
 # Models & results
 results/*.pkl
+results/**/*.pkl
 results/*.joblib
+results/**/*.joblib
+*.joblib
+*.pkl
 *.h5
 
 # OS/editor
