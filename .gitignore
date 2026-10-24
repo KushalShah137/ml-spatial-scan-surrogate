@@ -1,6 +1,8 @@
 # Data
 data/*.csv
 data/*.xlsx
+data/processed/*_windows.csv.gz
+data/synth/
 
 # Python
 __pycache__/

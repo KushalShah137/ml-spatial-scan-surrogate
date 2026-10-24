@@ -1,0 +1,16 @@
+Dataset: pneumoconioses
+County count: 3108
+Rows dropped for invalid county code: 0
+Raw totals row: "Total"			18700	6746347301	0.3
+Total deaths (totals row): 18700
+Sum of unsuppressed deaths: 13750
+Residual hidden deaths: 4950
+Suppressed county count: 1658
+Suppressed county percentage: 53.35%
+National rate: 2.77187034193e-06
+Population min/median/max: 2063 / 567796 / 2.1696e+08
+WONDER FIPS without centroid: []
+In-scope centroid FIPS without WONDER row: []
+Primary deaths sum: 18700
+Primary sum close to total deaths: yes
+Death buckets: 0=1002, suppressed (1-9)=1658, 10-19=238, 20-49=151, 50+=59

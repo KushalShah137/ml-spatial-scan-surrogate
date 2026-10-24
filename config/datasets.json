@@ -1,0 +1,17 @@
+[
+  {
+    "name": "mesothelioma",
+    "icd10": "C45",
+    "raw_file": "data/raw/mesothelioma.txt.tsv"
+  },
+  {
+    "name": "pneumoconioses",
+    "icd10": "J60-J64",
+    "raw_file": "data/raw/pneumoconioses.txt.tsv"
+  },
+  {
+    "name": "als",
+    "icd10": "G12.2",
+    "raw_file": "data/raw/als.txt.tsv"
+  }
+]
