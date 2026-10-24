@@ -17,7 +17,6 @@ models (MLR, Random Forest, SVR, MLP).
 - /data — input datasets (not committed to the repo)
 - /src — pipeline: data prep, scan engine, MC labeling, surrogate model, 
   baseline models, evaluation
-- /notebooks — exploratory analysis and result plots
 - /results — trained models, metrics, evaluation plots
 
 ## Status
