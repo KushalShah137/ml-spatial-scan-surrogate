@@ -24,15 +24,17 @@ def build_neighbors(lat, lon):
     return neighbors, ordered_distances
 
 
-def window_limits(pop, nb):
+def window_limits(pop, nb, pop_cap):
     population = np.asarray(pop, dtype=float).reshape(-1)
     neighbors = np.asarray(nb)
     if neighbors.ndim != 2 or neighbors.shape[0] != len(population):
         raise ValueError("Neighbor rows must match the population array.")
     if np.any(population < 0) or not np.isfinite(population).all() or population.sum() <= 0:
         raise ValueError("Population must contain finite non-negative values with a positive sum.")
+    if not np.isfinite(pop_cap) or pop_cap <= 0 or pop_cap > 1:
+        raise ValueError("Population cap must be greater than zero and at most one.")
     cumulative = np.cumsum(population[neighbors], axis=1)
-    limits = np.sum(cumulative <= population.sum() * 0.5, axis=1).astype(int)
+    limits = np.sum(cumulative <= population.sum() * pop_cap, axis=1).astype(int)
     return np.maximum(limits, 1)
 
 

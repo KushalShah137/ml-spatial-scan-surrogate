@@ -12,21 +12,27 @@ from scan import build_neighbors, load_dataset, most_likely_cluster, null_max_di
 def run_one(dataset):
     name = dataset["name"]
     started = time.perf_counter()
+    with (REPO_ROOT / "config" / "scan.json").open(encoding="utf-8") as handle:
+        scan_config = json.load(handle)
+    pop_cap = float(scan_config["pop_cap"])
+    replicates = int(scan_config["replicates"])
+    seed = int(scan_config["seed"])
     frame = load_dataset(name, "primary")
     population = frame["population"].to_numpy(dtype=float)
     counts = frame["deaths"].to_numpy(dtype=float)
     total_cases = int(round(counts.sum()))
     neighbors, distances = build_neighbors(frame["lat"].to_numpy(), frame["lon"].to_numpy())
-    limits = window_limits(population, neighbors)
+    limits = window_limits(population, neighbors, pop_cap)
     null_started = time.perf_counter()
-    null_max = null_max_distribution(population, total_cases, neighbors, limits, 999, 42)
+    null_max = null_max_distribution(population, total_cases, neighbors, limits, replicates, seed)
     null_elapsed = time.perf_counter() - null_started
-    null_path = REPO_ROOT / "data" / "processed" / f"{name}_null_max.npy"
+    cap_tag = f"c{int(round(pop_cap * 100))}"
+    null_path = REPO_ROOT / "data" / "processed" / f"{name}_{cap_tag}_null_max.npy"
     np.save(null_path, null_max)
     llr = observed_llr(counts, population, neighbors, limits)
     pvalues = window_p_values(llr, null_max)
     table = window_table(llr, pvalues, counts, population, neighbors, distances, limits, frame["fips"].to_numpy())
-    windows_path = REPO_ROOT / "data" / "processed" / f"{name}_windows.csv.gz"
+    windows_path = REPO_ROOT / "data" / "processed" / f"{name}_{cap_tag}_windows.csv.gz"
     table.to_csv(windows_path, index=False, compression="gzip")
     center, k, maximum = most_likely_cluster(llr)
     center_fips = str(frame.iloc[center]["fips"])
@@ -36,7 +42,7 @@ def run_one(dataset):
     significant = int((table["p_value"] < 0.05).sum())
     print(f"Dataset: {name}")
     print(f"Window count: {len(table)}")
-    print(f"Seconds per replicate: {null_elapsed / 999:.6f}")
+    print(f"Seconds per replicate: {null_elapsed / replicates:.6f}")
     print(f"Total runtime: {elapsed:.3f} seconds")
     print(
         "Most likely cluster: "
