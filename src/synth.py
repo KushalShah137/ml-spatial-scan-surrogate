@@ -12,7 +12,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from scan import build_neighbors, load_dataset, most_likely_cluster, null_max_distribution, observed_llr, window_limits, window_p_values, window_table
+from scan import build_neighbors, dataset_features, load_dataset, most_likely_cluster, null_max_distribution, observed_llr, window_limits, window_p_values, window_table
 
 
 def repository_root():
@@ -55,16 +55,6 @@ def peak_working_set_bytes():
         return None
 
 
-def gini_coefficient(values):
-    sorted_values = np.sort(np.asarray(values, dtype=float))
-    count = len(sorted_values)
-    total = sorted_values.sum()
-    if not count or total <= 0:
-        return 0.0
-    ranks = np.arange(1, count + 1, dtype=float)
-    return float((2.0 * np.dot(ranks, sorted_values) / (count * total)) - (count + 1.0) / count)
-
-
 def sample_windows(table, random):
     top_count = min(500, len(table))
     ranked = table.sort_values("llr", ascending=False, kind="stable")
@@ -80,10 +70,10 @@ def sample_windows(table, random):
     return top.reset_index(drop=True)
 
 
-def generate_dataset(dataset_id, pop_cap, replicates, scan_seed, is_national=False):
+def generate_dataset(dataset_id, pop_cap, replicates, scan_seed, is_national=False, output_dir=None):
     started = time.perf_counter()
     root = repository_root()
-    output_dir = root / "data" / "synth"
+    output_dir = Path(output_dir) if output_dir is not None else root / "data" / "synth"
     parts_dir = output_dir / "meta_parts"
     output_dir.mkdir(parents=True, exist_ok=True)
     parts_dir.mkdir(parents=True, exist_ok=True)
@@ -146,17 +136,12 @@ def generate_dataset(dataset_id, pop_cap, replicates, scan_seed, is_national=Fal
     selected = sample_windows(table, random)
     observed_max = float(np.max(llr))
     quantiles = np.quantile(null_max, [0.5, 0.9, 0.95, 0.99])
+    features = dataset_features(population, counts, len(table))
     metadata = {
         "id": int(dataset_id),
         "seed": int(seed),
         "is_national": bool(is_national),
-        "n_counties": int(region_size),
-        "N": int(total_cases),
-        "n_windows": int(len(table)),
-        "total_pop": float(population.sum()),
-        "pop_gini": gini_coefficient(population),
-        "max_pop_share": float(population.max() / population.sum()),
-        "frac_counties_mu_below_1": float(np.mean(total_cases * population / population.sum() < 1.0)),
+        **features,
         "sigma": sigma,
         "has_cluster": has_cluster,
         "cluster_m": cluster_m,

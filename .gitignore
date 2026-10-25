@@ -28,3 +28,6 @@ results/**/*.joblib
 .DS_Store
 .vscode/
 .idea/
+
+data/train/
+results/predictions/

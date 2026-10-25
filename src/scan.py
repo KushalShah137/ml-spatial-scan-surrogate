@@ -4,6 +4,30 @@ import numpy as np
 import pandas as pd
 
 
+def dataset_features(pop, counts, n_windows):
+    population = np.asarray(pop, dtype=float).reshape(-1)
+    observed = np.asarray(counts, dtype=float).reshape(-1)
+    if population.size == 0 or observed.shape != population.shape:
+        raise ValueError("Population and counts must be non-empty arrays of equal length.")
+    total_population = float(population.sum())
+    total_cases = int(round(float(observed.sum())))
+    if total_population <= 0 or np.any(population < 0) or not np.isfinite(population).all():
+        raise ValueError("Population must be finite, non-negative, and have a positive sum.")
+    sorted_values = np.sort(population)
+    count = len(sorted_values)
+    ranks = np.arange(1, count + 1, dtype=float)
+    gini = float((2.0 * np.dot(ranks, sorted_values) / (count * total_population)) - (count + 1.0) / count)
+    return {
+        "n_counties": int(len(population)),
+        "N": total_cases,
+        "n_windows": int(n_windows),
+        "total_pop": total_population,
+        "pop_gini": gini,
+        "max_pop_share": float(population.max() / total_population),
+        "frac_counties_mu_below_1": float(np.mean(total_cases * population / total_population < 1.0)),
+    }
+
+
 def load_dataset(name, variant="primary"):
     root = Path(__file__).resolve().parent.parent
     path = root / "data" / "processed" / f"{name}_county_{variant}.csv"

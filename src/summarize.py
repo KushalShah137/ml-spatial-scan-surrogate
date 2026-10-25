@@ -1,0 +1,52 @@
+from pathlib import Path
+
+import pandas as pd
+
+
+ROOT = Path(__file__).resolve().parent.parent
+TABLES = ROOT / "results" / "tables"
+
+
+def print_table(title, frame, columns=None, sort_by=None):
+    print(f"\n{title}")
+    selected = frame[columns] if columns else frame
+    if sort_by and sort_by in selected.columns:
+        selected = selected.sort_values(sort_by, kind="stable")
+    with pd.option_context("display.max_columns", None, "display.width", 300):
+        print(selected.to_string(index=False, na_rep="NA", float_format=lambda value: f"{value:.4f}"))
+
+
+def main():
+    windows = pd.read_csv(TABLES / "window_metrics.csv")
+    selected = windows[(windows["scope"] == "synthetic_test") & (windows["window_filter"] == "llr_positive") & (windows["sample_stratum"] == "all")]
+    window_summary = selected.groupby("model", as_index=False).agg(
+        mae_log10_p=("mae_t", "mean"),
+        mae_p_0_01_to_0_10=("mae_p_0_01_to_0_10", "mean"),
+        f1_at_0_05=("f1", "mean"),
+    )
+    print_table("Synthetic test windows (llr > 0; model averages across test sets)", window_summary, ["model", "mae_log10_p", "mae_p_0_01_to_0_10", "f1_at_0_05"], "model")
+
+    dataset = pd.read_csv(TABLES / "dataset_metrics.csv")
+    synthetic_dataset = dataset[dataset["scope"] == "synthetic_test"]
+    dataset_summary = synthetic_dataset.groupby("model", as_index=False).agg(absolute_log10_p_error=("absolute_log10_p_error", "mean"))
+    print_table("Synthetic test most-likely-cluster absolute log10 p error", dataset_summary, ["model", "absolute_log10_p_error"], "model")
+
+    type1 = pd.read_csv(TABLES / "type1_power.csv")
+    type1_summary = type1[["group", "method", "significant_count", "n_datasets", "fraction_significant", "ci95_low", "ci95_high"]]
+    print_table("Type I error and power (Clopper-Pearson 95% intervals)", type1_summary, sort_by="group")
+
+    quality = pd.read_csv(TABLES / "gumbel_regression_quality.csv")
+    print_table("Gumbel parameter regression quality on test datasets", quality)
+
+    learning = pd.read_csv(TABLES / "learning_curve.csv")
+    print_table("Learning curve", learning)
+
+    real = pd.read_csv(TABLES / "real_all_windows.csv")
+    print_table("Real all-window evaluation", real, sort_by="dataset")
+
+    cost = pd.read_csv(TABLES / "cost.csv")
+    print_table("Cost and break-even", cost, sort_by="dataset")
+
+
+if __name__ == "__main__":
+    main()
