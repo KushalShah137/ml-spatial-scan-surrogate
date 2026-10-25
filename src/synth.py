@@ -7,6 +7,7 @@ import json
 import math
 import os
 import time
+from functools import lru_cache
 from pathlib import Path
 
 import numpy as np
@@ -70,6 +71,58 @@ def sample_windows(table, random):
     return top.reset_index(drop=True)
 
 
+@lru_cache(maxsize=1)
+def region_resources():
+    root = repository_root()
+    with (root / "config" / "datasets.json").open(encoding="utf-8") as handle:
+        datasets = json.load(handle)
+    population_source = load_dataset(datasets[0]["name"], "primary")
+    centroids = pd.read_csv(root / "data" / "external" / "census_county_centroids.csv", dtype={"fips": str})
+    geography = centroids.merge(population_source[["fips", "population"]], on="fips", how="inner", validate="one_to_one").reset_index(drop=True)
+    all_neighbors, _ = build_neighbors(geography["lat"].to_numpy(), geography["lon"].to_numpy())
+    return geography, all_neighbors
+
+
+def sample_region(random, is_national=False):
+    geography, all_neighbors = region_resources()
+    sampled_region_size = int(np.rint(np.exp(random.uniform(np.log(150), np.log(len(geography))))))
+    sampled_region_size = min(max(sampled_region_size, 150), len(geography))
+    sampled_region_center = int(random.integers(len(geography)))
+    if is_national:
+        region = geography.reset_index(drop=True)
+        return region, all_neighbors
+    region_indices = all_neighbors[sampled_region_center, :sampled_region_size].astype(int)
+    return geography.iloc[region_indices].reset_index(drop=True), None
+
+
+def sample_case_counts(population, random, neighbors=None, pure_null=False):
+    population = np.asarray(population, dtype=float)
+    total_cases = int(np.rint(np.exp(random.uniform(np.log(200), np.log(200000)))))
+    risk = np.ones(len(population), dtype=float)
+    if pure_null:
+        sigma = 0.0
+        has_cluster = False
+        cluster_m = 0
+        cluster_rr = 0.0
+    else:
+        has_heterogeneity = bool(random.random() < 0.3)
+        sigma = float(random.uniform(0.1, 0.5)) if has_heterogeneity else 0.0
+        if has_heterogeneity:
+            risk *= random.lognormal(0.0, sigma, size=len(population))
+        has_cluster = bool(random.random() < 0.5)
+        cluster_m = 0
+        cluster_rr = 0.0
+        if has_cluster:
+            cluster_center = int(random.integers(len(population)))
+            cluster_m = int(random.integers(1, 41))
+            cluster_rr = float(random.uniform(1.2, 4.0))
+            risk[np.asarray(neighbors)[cluster_center, :cluster_m].astype(int)] *= cluster_rr
+    probabilities = population * risk
+    probabilities = probabilities / probabilities.sum()
+    counts = random.multinomial(total_cases, probabilities)
+    return total_cases, counts, sigma, has_cluster, cluster_m, cluster_rr
+
+
 def generate_dataset(dataset_id, pop_cap, replicates, scan_seed, is_national=False, output_dir=None):
     started = time.perf_counter()
     root = repository_root()
@@ -87,47 +140,17 @@ def generate_dataset(dataset_id, pop_cap, replicates, scan_seed, is_national=Fal
 
     seed = 100000 + int(dataset_id)
     random = np.random.default_rng(seed)
-    with (root / "config" / "datasets.json").open(encoding="utf-8") as handle:
-        datasets = json.load(handle)
-    population_source = load_dataset(datasets[0]["name"], "primary")
-    centroid_path = root / "data" / "external" / "census_county_centroids.csv"
-    centroids = pd.read_csv(centroid_path, dtype={"fips": str})
-    geography = centroids.merge(population_source[["fips", "population"]], on="fips", how="inner", validate="one_to_one")
-    geography = geography.reset_index(drop=True)
-    all_neighbors, _ = build_neighbors(geography["lat"].to_numpy(), geography["lon"].to_numpy())
-
-    sampled_region_size = int(np.rint(np.exp(random.uniform(np.log(150), np.log(len(geography))))))
-    sampled_region_size = min(max(sampled_region_size, 150), len(geography))
-    sampled_region_center = int(random.integers(len(geography)))
-    if is_national:
-        region_size = len(geography)
-        region_indices = np.arange(region_size, dtype=int)
-    else:
-        region_size = sampled_region_size
-        region_indices = all_neighbors[sampled_region_center, :region_size].astype(int)
-    region = geography.iloc[region_indices].reset_index(drop=True)
+    region, cached_neighbors = sample_region(random, is_national)
+    region_size = len(region)
     population = region["population"].to_numpy(dtype=float)
     lat = region["lat"].to_numpy(dtype=float)
     lon = region["lon"].to_numpy(dtype=float)
-    neighbors, distances = build_neighbors(lat, lon)
-
-    total_cases = int(np.rint(np.exp(random.uniform(np.log(200), np.log(200000)))))
-    risk = np.ones(region_size, dtype=float)
-    has_heterogeneity = bool(random.random() < 0.3)
-    sigma = float(random.uniform(0.1, 0.5)) if has_heterogeneity else 0.0
-    if has_heterogeneity:
-        risk *= random.lognormal(0.0, sigma, size=region_size)
-    has_cluster = bool(random.random() < 0.5)
-    cluster_m = 0
-    cluster_rr = 0.0
-    if has_cluster:
-        cluster_center = int(random.integers(region_size))
-        cluster_m = int(random.integers(1, 41))
-        cluster_rr = float(random.uniform(1.2, 4.0))
-        risk[neighbors[cluster_center, :cluster_m].astype(int)] *= cluster_rr
-    probabilities = population * risk
-    probabilities = probabilities / probabilities.sum()
-    counts = random.multinomial(total_cases, probabilities)
+    if cached_neighbors is None:
+        neighbors, distances = build_neighbors(lat, lon)
+    else:
+        neighbors = cached_neighbors
+        _, distances = build_neighbors(lat, lon)
+    total_cases, counts, sigma, has_cluster, cluster_m, cluster_rr = sample_case_counts(population, random, neighbors)
     limits = window_limits(population, neighbors, pop_cap)
     null_max = null_max_distribution(population, total_cases, neighbors, limits, replicates, seed + int(scan_seed))
     llr = observed_llr(counts, population, neighbors, limits)

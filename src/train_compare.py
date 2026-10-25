@@ -555,7 +555,7 @@ def make_real_all_windows(name, models, threshold, gumbel_bundle):
     predictions = {}
     xgb_model_fit, xgb_features = models["xgboost"]
     xgb_t = np.asarray(xgb_model_fit.predict(frame[xgb_features].to_numpy(dtype=float)), dtype=float)
-    predictions["surrogate_xgboost"] = np.clip(np.power(10.0, -np.clip(xgb_t, -20.0, 20.0)), 0.001, 1.0)
+    predictions["xgboost_per_window"] = np.clip(np.power(10.0, -np.clip(xgb_t, -20.0, 20.0)), 0.001, 1.0)
     isotonic = models["isotonic"][0]
     isotonic_t = np.asarray(isotonic.predict(frame["llr"].to_numpy(dtype=float)), dtype=float)
     predictions["isotonic"] = np.clip(np.power(10.0, -np.clip(isotonic_t, -20.0, 20.0)), 0.001, 1.0)
@@ -668,7 +668,7 @@ def main():
         xgb_column = f"pred_p_{main_xgb}"
         for method, values in (
             ("true_monte_carlo", top["p_value"].to_numpy(dtype=float)),
-            ("surrogate_xgboost", top[xgb_column].to_numpy(dtype=float)),
+            ("xgboost_per_window", top[xgb_column].to_numpy(dtype=float)),
             ("gumbel99", top["pred_p_gumbel99"].to_numpy(dtype=float)),
             ("gumbel999", top["pred_p_gumbel999"].to_numpy(dtype=float)),
             ("mc99", top["pred_p_mc99"].to_numpy(dtype=float)),
