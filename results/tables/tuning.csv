@@ -1,0 +1,22 @@
+model,parameters,validation_mae_t,selected
+xgboost,"{""learning_rate"":0.03,""max_depth"":3}",0.007045384352961426,False
+xgboost,"{""learning_rate"":0.1,""max_depth"":3}",0.00670627009131025,False
+xgboost,"{""learning_rate"":0.03,""max_depth"":5}",0.0052214375947247284,True
+xgboost,"{""learning_rate"":0.1,""max_depth"":5}",0.005582236367264698,False
+mlr,"{""estimator"":""linear_regression"",""scaler"":""standard""}",0.24849369549446873,True
+random_forest,"{""min_samples_leaf"":20,""n_estimators"":200}",0.004209325513347027,True
+svr,"{""C"":0.1,""gamma"":""scale"",""kernel"":""rbf"",""scaler"":""standard""}",0.1463748735740851,False
+svr,"{""C"":1.0,""gamma"":""scale"",""kernel"":""rbf"",""scaler"":""standard""}",0.12404346207079359,False
+svr,"{""C"":10.0,""gamma"":""scale"",""kernel"":""rbf"",""scaler"":""standard""}",0.11397350730643442,True
+mlp,"{""alpha"":0.0001,""early_stopping"":true,""hidden_layer_sizes"":[64,32]}",0.00749595171853494,False
+mlp,"{""alpha"":0.001,""early_stopping"":true,""hidden_layer_sizes"":[64,32]}",0.006471961798154335,False
+mlp,"{""alpha"":0.01,""early_stopping"":true,""hidden_layer_sizes"":[64,32]}",0.0054100997421648945,True
+isotonic,"{""feature"": ""llr"", ""increasing"": true}",0.015445889740196455,True
+xgboost_no_dataset_features,"{""features"":""window_only"",""learning_rate"":0.03,""max_depth"":3}",0.014608877557006232,False
+xgboost_no_dataset_features,"{""features"":""window_only"",""learning_rate"":0.1,""max_depth"":3}",0.01334809079240241,False
+xgboost_no_dataset_features,"{""features"":""window_only"",""learning_rate"":0.03,""max_depth"":5}",0.011312686670834154,True
+xgboost_no_dataset_features,"{""features"":""window_only"",""learning_rate"":0.1,""max_depth"":5}",0.011646217439495269,False
+xgboost_monotone_llr,"{""learning_rate"":0.03,""llr_constraint"":""increasing"",""max_depth"":3}",0.007308037039809214,False
+xgboost_monotone_llr,"{""learning_rate"":0.1,""llr_constraint"":""increasing"",""max_depth"":3}",0.007131318396287306,False
+xgboost_monotone_llr,"{""learning_rate"":0.03,""llr_constraint"":""increasing"",""max_depth"":5}",0.005374088962892205,True
+xgboost_monotone_llr,"{""learning_rate"":0.1,""llr_constraint"":""increasing"",""max_depth"":5}",0.0058334936123123765,False

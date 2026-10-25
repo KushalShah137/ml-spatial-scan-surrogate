@@ -44,8 +44,23 @@ def main():
     real = pd.read_csv(TABLES / "real_all_windows.csv")
     print_table("Real all-window evaluation", real, sort_by="dataset")
 
+    repeats = pd.read_csv(TABLES / "baseline_repeats.csv")
+    baseline_summary = repeats[repeats["row_type"] == "summary"].copy()
+    surrogate = real[real["method"] == "surrogate_xgboost"][["dataset", "hard_window_count", "hard_f1", "hard_mae_log10_p"]].copy()
+    surrogate["row_type"] = "surrogate_reference"
+    surrogate["statistic"] = "real_all_windows"
+    surrogate["method"] = "surrogate_xgboost"
+    surrogate["seed"] = float("nan")
+    surrogate["hard_window_count"] = surrogate["hard_window_count"].astype(int)
+    surrogate = surrogate[["row_type", "statistic", "dataset", "method", "seed", "hard_window_count", "hard_f1", "hard_mae_log10_p"]]
+    baseline_summary = baseline_summary[["row_type", "statistic", "dataset", "method", "seed", "hard_window_count", "hard_f1", "hard_mae_log10_p"]]
+    print_table("Baseline repeats summary and existing surrogate comparison", pd.concat([baseline_summary, surrogate], ignore_index=True), sort_by="dataset")
+
     cost = pd.read_csv(TABLES / "cost.csv")
     print_table("Cost and break-even", cost, sort_by="dataset")
+
+    cost_by_n = pd.read_csv(TABLES / "cost_by_n.csv")
+    print_table("Cost by training dataset count", cost_by_n, sort_by="n_training_datasets")
 
 
 if __name__ == "__main__":
