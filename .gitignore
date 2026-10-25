@@ -3,6 +3,7 @@ data/*.csv
 data/*.xlsx
 data/processed/*_windows.csv.gz
 data/synth/
+data/synth_pilot/
 
 # Python
 __pycache__/

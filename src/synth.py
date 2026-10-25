@@ -2,6 +2,7 @@ import argparse
 import concurrent.futures
 import ctypes
 from ctypes import wintypes
+from datetime import datetime, timezone
 import json
 import math
 import os
@@ -79,7 +80,7 @@ def sample_windows(table, random):
     return top.reset_index(drop=True)
 
 
-def generate_dataset(dataset_id, pop_cap, replicates, scan_seed):
+def generate_dataset(dataset_id, pop_cap, replicates, scan_seed, is_national=False):
     started = time.perf_counter()
     root = repository_root()
     output_dir = root / "data" / "synth"
@@ -105,17 +106,22 @@ def generate_dataset(dataset_id, pop_cap, replicates, scan_seed):
     geography = geography.reset_index(drop=True)
     all_neighbors, _ = build_neighbors(geography["lat"].to_numpy(), geography["lon"].to_numpy())
 
-    region_size = int(np.rint(np.exp(random.uniform(np.log(150), np.log(len(geography))))))
-    region_size = min(max(region_size, 150), len(geography))
-    region_center = int(random.integers(len(geography)))
-    region_indices = all_neighbors[region_center, :region_size].astype(int)
+    sampled_region_size = int(np.rint(np.exp(random.uniform(np.log(150), np.log(len(geography))))))
+    sampled_region_size = min(max(sampled_region_size, 150), len(geography))
+    sampled_region_center = int(random.integers(len(geography)))
+    if is_national:
+        region_size = len(geography)
+        region_indices = np.arange(region_size, dtype=int)
+    else:
+        region_size = sampled_region_size
+        region_indices = all_neighbors[sampled_region_center, :region_size].astype(int)
     region = geography.iloc[region_indices].reset_index(drop=True)
     population = region["population"].to_numpy(dtype=float)
     lat = region["lat"].to_numpy(dtype=float)
     lon = region["lon"].to_numpy(dtype=float)
     neighbors, distances = build_neighbors(lat, lon)
 
-    total_cases = int(np.rint(np.exp(random.uniform(np.log(200), np.log(50000)))))
+    total_cases = int(np.rint(np.exp(random.uniform(np.log(200), np.log(200000)))))
     risk = np.ones(region_size, dtype=float)
     has_heterogeneity = bool(random.random() < 0.3)
     sigma = float(random.uniform(0.1, 0.5)) if has_heterogeneity else 0.0
@@ -143,6 +149,7 @@ def generate_dataset(dataset_id, pop_cap, replicates, scan_seed):
     metadata = {
         "id": int(dataset_id),
         "seed": int(seed),
+        "is_national": bool(is_national),
         "n_counties": int(region_size),
         "N": int(total_cases),
         "n_windows": int(len(table)),
@@ -189,11 +196,25 @@ def merge_metadata(output_dir):
     os.replace(temporary, target)
 
 
+def append_progress(output_dir, metadata):
+    record = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "id": int(metadata["id"]),
+        "n_counties": int(metadata["n_counties"]),
+        "N": int(metadata["N"]),
+        "seconds": float(metadata["seconds_total"]),
+    }
+    with (output_dir / "progress.log").open("a", encoding="utf-8", newline="\n") as handle:
+        handle.write(json.dumps(record, separators=(",", ":")) + "\n")
+        handle.flush()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--count", type=int, required=True)
     parser.add_argument("--workers", type=int, required=True)
     parser.add_argument("--start", type=int, required=True)
+    parser.add_argument("--national", action="store_true")
     args = parser.parse_args()
     if args.count < 0 or args.workers < 1 or args.start < 0:
         parser.error("count and start must be non-negative, and workers must be positive.")
@@ -202,14 +223,16 @@ def main():
         scan_config = json.load(handle)
     output_dir = root / "data" / "synth"
     output_dir.mkdir(parents=True, exist_ok=True)
-    jobs = [(dataset_id, float(scan_config["pop_cap"]), int(scan_config["replicates"]), int(scan_config["seed"])) for dataset_id in range(args.start, args.start + args.count)]
+    jobs = [(dataset_id, float(scan_config["pop_cap"]), int(scan_config["replicates"]), int(scan_config["seed"]), args.national) for dataset_id in range(args.start, args.start + args.count)]
     wall_started = time.perf_counter()
     results = []
     if jobs:
         with concurrent.futures.ProcessPoolExecutor(max_workers=args.workers) as executor:
             futures = [executor.submit(generate_dataset, *job) for job in jobs]
             for future in concurrent.futures.as_completed(futures):
-                results.append(future.result())
+                result = future.result()
+                results.append(result)
+                append_progress(output_dir, result["meta"])
     results.sort(key=lambda result: result["meta"]["id"])
     for result in results:
         record = result["meta"]
