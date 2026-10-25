@@ -111,7 +111,7 @@ def make_learning_curve():
     axis.set(xlabel="Training datasets", ylabel="Band MAE on p", title="Learning curve")
     handles, labels = axis.get_legend_handles_labels()
     figure.legend(handles, labels, frameon=False, ncol=2, loc="lower center", bbox_to_anchor=(0.5, 0.02))
-    figure.tight_layout(rect=(0, 0.3, 1, 1))
+    figure.tight_layout(rect=(0, 0.1, 1, 1))
     save_figure("fig_learning_curve", figure, SINGLE)
 
 
@@ -281,10 +281,10 @@ def make_real_hard_f1():
         if method in ("gumbel99", "mc99"):
             axis.errorbar(offsets, means, yerr=[np.array(means) - np.array(lows), np.array(highs) - np.array(means)], fmt="none", ecolor="#222222", capsize=1.4, linewidth=0.7)
         for x, value in zip(offsets, means):
-            inside = method in ("gumbel99", "mc99") or value + 0.008 > 0.992
-            axis.text(x, value - 0.006 if inside else value + 0.008, f"{value:.2f}", ha="center", va="top" if inside else "bottom", fontsize=5, rotation=90 if width < 0.09 else 0, color="white" if inside else "black")
+            digits = 4 if value >= 0.9995 else 3 if value >= 0.99 else 2
+            axis.text(x, value + 0.004, f"{value:.{digits}f}", ha="center", va="bottom", fontsize=5, rotation=90 if width < 0.09 else 0, color="#222222", clip_on=False)
     axis.set_xticks(centers, [DATASET_DISPLAY_NAMES.get(dataset, dataset) for dataset in datasets])
-    axis.set_ylim(0.6, 1.0)
+    axis.set_ylim(0.6, 1.02)
     axis.set_ylabel("Hard-subset F1")
     axis.set_title(f"Real-dataset hard-subset performance ({REAL_SOURCE})", pad=6)
     handles, legend_labels = axis.get_legend_handles_labels()

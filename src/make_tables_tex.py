@@ -69,16 +69,17 @@ def synthetic_table():
             grouped=errors.groupby(predictions.id).agg(["sum","count"])
             by_d[method]=(grouped["sum"].reindex(all_ids,fill_value=0).to_numpy(dtype=float),grouped["count"].reindex(all_ids,fill_value=0).to_numpy(dtype=float))
     methods=method_order(set(b.index)&set(f.index)&set(c.index)); eligible=[m for m in methods if (99 if m in ("mc99","gumbel99") else 999 if m=="gumbel999" else 0)<=99]
-    rounded={m:{"band":float(f"{b[m]:.4f}"),"f1":float(f"{f[m]:.3f}"),"cluster":float(f"{c[m]:.4f}"),"replicates":99 if m in ("mc99","gumbel99") else 0} for m in eligible}
+    rounded={m:{"band":float(f"{b[m]:.4f}"),"f1":float(f"{f[m]:.4f}" if f[m]>=0.9995 else f"{f[m]:.3f}"),"cluster":float(f"{c[m]:.4f}"),"replicates":99 if m in ("mc99","gumbel99") else 0} for m in eligible}
     best={"band":min(v["band"] for v in rounded.values()),"f1":max(v["f1"] for v in rounded.values()),"cluster":min(v["cluster"] for v in rounded.values()),"replicates":min(v["replicates"] for v in rounded.values())}; rows=[]
     for m in methods:
         reps=99 if m in ("gumbel99","mc99") else 999 if m=="gumbel999" else 0
         ci=bootstrap_ci(*by_d[m]) if m in by_d and len(all_ids)==90 else (np.nan,np.nan)
         raw={"band":float(b[m]),"f1":float(f[m]),"cluster":float(c[m]),"replicates":reps}; bold=set()
         if reps<=99:
-            displayed={"band":float(f"{raw['band']:.4f}"),"f1":float(f"{raw['f1']:.3f}"),"cluster":float(f"{raw['cluster']:.4f}"),"replicates":reps}
-            bold={key for key in displayed if displayed[key]==best[key]}
-        rows.append({"group":group_for(m),"columns":["method","band","f1","cluster","replicates"],"display":{"method":esc(DISPLAY.get(m,m)),"band":f"{fmt(raw['band'])} [{fmt(ci[0])}, {fmt(ci[1])}]","f1":fmt(raw['f1'],3),"cluster":fmt(raw['cluster']),"replicates":str(reps)},"bold":bold})
+            displayed={"band":float(f"{raw['band']:.4f}"),"f1":float(f"{raw['f1']:.4f}" if raw['f1'] >= 0.9995 else f"{raw['f1']:.3f}"),"cluster":float(f"{raw['cluster']:.4f}"),"replicates":reps}
+            bold={key for key in displayed if key != "replicates" and displayed[key]==best[key]}
+        f1_digits = 4 if raw["f1"] >= 0.9995 else 3
+        rows.append({"group":group_for(m),"columns":["method","band","f1","cluster","replicates"],"display":{"method":esc(DISPLAY.get(m,m)),"band":f"{fmt(raw['band'])} [{fmt(ci[0])}, {fmt(ci[1])}]","f1":fmt(raw['f1'],f1_digits),"cluster":fmt(raw['cluster']),"replicates":str(reps)},"bold":bold})
     write_table("synthetic_test_comparison.tex",["Method",r"Band MAE [95\% bootstrap CI]","F1 @ 0.05",r"Cluster $|\Delta\log_{10}p|$","MC replicates"],rows,"lrrrr")
 def paired_bootstrap():
     predictions=pd.read_csv(ROOT/"results"/"predictions"/"synthetic_test_predictions.csv.gz")
@@ -133,7 +134,7 @@ def real_table():
     for ds in DATASET_ORDER:
         by_dataset[ds]={}; sub=real[real.dataset==ds]
         for m in sub.method.unique():
-            row=sub[sub.method==m].iloc[0]; by_dataset[ds][m]=(float(row.hard_f1),float(row.hard_mae_log10_p))
+            row=sub[sub.method==m].iloc[0]; by_dataset[ds][m]=(float(row.hard_f1),None if m=="constant_threshold" else float(row.hard_mae_log10_p))
         for m in ("gumbel99","mc99"):
             values=summary[(summary.dataset==ds)&(summary.method==m)]
             if len(values):
@@ -141,14 +142,14 @@ def real_table():
     rows=[]
     for dataset_index,ds in enumerate(DATASET_ORDER):
         methods=method_order(by_dataset[ds]); eligible=[m for m in methods if m!="gumbel999"]
-        bf=max((by_dataset[ds][m][0] for m in eligible),default=np.nan); bm=min((by_dataset[ds][m][1] for m in eligible),default=np.nan)
+        bf=max((by_dataset[ds][m][0] for m in eligible),default=np.nan); bm=min((by_dataset[ds][m][1] for m in eligible if by_dataset[ds][m][1] is not None),default=np.nan)
         rows.append({"raw_line":r"\multicolumn{4}{l}{\textbf{"+esc(DATASET_DISPLAY_NAMES.get(ds,ds))+r"}} "+r"\\","rule_before":r"\midrule" if dataset_index else None})
         previous_method_group=None
         for m in methods:
-            fv,mv=by_dataset[ds][m]; ftxt,mtxt=fmt(fv,3),fmt(mv,4); bold=set()
+            fv,mv=by_dataset[ds][m]; ftxt,mtxt=fmt(fv,4 if fv>=0.9995 else 3),fmt(mv,4); bold=set()
             if m!="gumbel999":
                 if np.isclose(fv,bf): bold.add("f1")
-                if np.isclose(mv,bm): bold.add("mae")
+                if mv is not None and np.isclose(mv,bm): bold.add("mae")
             if m in ("gumbel99","mc99"):
                 s=summary[(summary.dataset==ds)&(summary.method==m)&(summary.statistic=="std")].iloc[0]
                 ftxt+=f" ({fmt(s.hard_f1,3)})"; mtxt+=f" ({fmt(s.hard_mae_log10_p,4)})"
