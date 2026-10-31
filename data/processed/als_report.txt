@@ -1,0 +1,16 @@
+Dataset: als
+County count: 3108
+Rows dropped for invalid county code: 0
+Raw totals row: "Total"			140945	6746347301	2.1
+Total deaths (totals row): 140945
+Sum of unsuppressed deaths: 134740
+Residual hidden deaths: 6205
+Suppressed county count: 1140
+Suppressed county percentage: 36.68%
+National rate: 2.0892046275e-05
+Population min/median/max: 2063 / 567796 / 2.1696e+08
+WONDER FIPS without centroid: []
+In-scope centroid FIPS without WONDER row: []
+Primary deaths sum: 140945
+Primary sum close to total deaths: yes
+Death buckets: 0=94, suppressed (1-9)=1140, 10-19=650, 20-49=625, 50+=599

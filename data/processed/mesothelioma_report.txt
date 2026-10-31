@@ -1,0 +1,16 @@
+Dataset: mesothelioma
+County count: 3108
+Rows dropped for invalid county code: 0
+Raw totals row: "Total"			54905	6746347301	0.8
+Total deaths (totals row): 54905
+Sum of unsuppressed deaths: 48288
+Residual hidden deaths: 6617
+Suppressed county count: 1695
+Suppressed county percentage: 54.54%
+National rate: 8.13847813495e-06
+Population min/median/max: 2063 / 567796 / 2.1696e+08
+WONDER FIPS without centroid: []
+In-scope centroid FIPS without WONDER row: []
+Primary deaths sum: 54905
+Primary sum close to total deaths: yes
+Death buckets: 0=392, suppressed (1-9)=1695, 10-19=442, 20-49=329, 50+=250

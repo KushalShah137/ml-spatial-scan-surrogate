@@ -1,0 +1,36 @@
+# Data
+data/*.csv
+data/*.xlsx
+data/raw/
+data/processed/*_windows.csv.gz
+!data/processed/*_null_max.npy
+!data/processed/*_c10_ref_null_max.npy
+data/synth/
+data/synth_pilot/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Models & results
+results/*.pkl
+results/**/*.pkl
+results/*.joblib
+results/**/*.joblib
+*.joblib
+*.pkl
+*.h5
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/
+
+data/train/
+results/predictions/

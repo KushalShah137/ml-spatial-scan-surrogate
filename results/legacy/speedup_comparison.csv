@@ -1,0 +1,3 @@
+method,mean_time_ms,speedup_factor
+Traditional Monte Carlo (R=999),69.18889000226045,1.0
+XGBoost Surrogate (1 prediction),0.0030697904758632,22538.635957818944

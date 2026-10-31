@@ -1,0 +1,22 @@
+\begin{tabular}{lrrrr}
+\toprule
+Method & Band MAE [95\% bootstrap CI] & F1 @ 0.05 & Cluster $|\Delta\log_{10}p|$ & MC replicates \\
+\midrule
+Surrogate (XGBoost) & \textbf{0.0052 [0.0040, 0.0068]} & \textbf{0.997} & \textbf{0.0166} & 0 \\
+Surrogate (ridge) & 0.0054 [0.0040, 0.0072] & \textbf{0.997} & 0.0169 & 0 \\
+Per-window XGBoost, no dataset features & 0.0213 [0.0161, 0.0271] & 0.991 & 0.0855 & 0 \\
+Per-window XGBoost, monotone in LLR & 0.0111 [0.0085, 0.0141] & 0.994 & 0.0311 & 0 \\
+Per-window XGBoost & 0.0109 [0.0086, 0.0139] & 0.994 & 0.0322 & 0 \\
+\midrule
+Isotonic & 0.0444 [0.0301, 0.0647] & 0.983 & 0.1057 & 0 \\
+MLR & 0.0220 [0.0209, 0.0232] & 0.974 & 0.6516 & 0 \\
+Random forest & 0.0087 [0.0069, 0.0107] & 0.996 & 0.0195 & 0 \\
+SVR & 0.0515 [0.0359, 0.0654] & 0.957 & 0.4459 & 0 \\
+MLP & 0.0082 [0.0064, 0.0107] & 0.996 & 0.0344 & 0 \\
+\midrule
+Gumbel-99 & 0.0070 [0.0051, 0.0089] & 0.996 & 0.0240 & 99 \\
+MC-99 & 0.0114 [0.0087, 0.0149] & 0.994 & 0.5783 & 99 \\
+\midrule
+Gumbel-999 & 0.0035 [0.0026, 0.0046] & 0.998 & 0.0106 & 999 \\
+\bottomrule
+\end{tabular}

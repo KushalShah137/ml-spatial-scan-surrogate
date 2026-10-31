@@ -1,0 +1,44 @@
+\begin{tabular}{llrr}
+\toprule
+Dataset & Method & Hard F1 & Hard MAE $-\log_{10}p$ \\
+\midrule
+\multicolumn{4}{l}{\textbf{Mesothelioma}} \\
+ & Surrogate (XGBoost) & 0.979 & 0.0324 \\
+ & Surrogate (ridge) & \textbf{0.981} & \textbf{0.0299} \\
+ & Per-window XGBoost & 0.889 & 0.1298 \\
+\cmidrule(lr){2-4}
+ & Isotonic & 0.746 & 0.6177 \\
+ & Constant threshold & 0.716 & -- \\
+\cmidrule(lr){2-4}
+ & Gumbel-99 & 0.946 (0.043) & 0.1025 (0.0857) \\
+ & MC-99 & 0.907 (0.117) & 0.1546 (0.0729) \\
+\cmidrule(lr){2-4}
+ & Gumbel-999 & 0.996 & 0.0138 \\
+\midrule
+\multicolumn{4}{l}{\textbf{Pneumoconioses}} \\
+ & Surrogate (XGBoost) & 0.996 & \textbf{0.0134} \\
+ & Surrogate (ridge) & \textbf{0.9997} & 0.0181 \\
+ & Per-window XGBoost & 0.850 & 0.1326 \\
+\cmidrule(lr){2-4}
+ & Isotonic & 0.785 & 0.5657 \\
+ & Constant threshold & 0.739 & -- \\
+\cmidrule(lr){2-4}
+ & Gumbel-99 & 0.947 (0.054) & 0.0901 (0.0808) \\
+ & MC-99 & 0.851 (0.155) & 0.1760 (0.0782) \\
+\cmidrule(lr){2-4}
+ & Gumbel-999 & 0.972 & 0.0348 \\
+\midrule
+\multicolumn{4}{l}{\textbf{ALS}} \\
+ & Surrogate (XGBoost) & 0.988 & 0.0194 \\
+ & Surrogate (ridge) & \textbf{0.999} & \textbf{0.0189} \\
+ & Per-window XGBoost & 0.888 & 0.1339 \\
+\cmidrule(lr){2-4}
+ & Isotonic & 0.768 & 0.6035 \\
+ & Constant threshold & 0.735 & -- \\
+\cmidrule(lr){2-4}
+ & Gumbel-99 & 0.917 (0.071) & 0.1474 (0.0978) \\
+ & MC-99 & 0.799 (0.203) & 0.2138 (0.0813) \\
+\cmidrule(lr){2-4}
+ & Gumbel-999 & 0.972 & 0.0428 \\
+\bottomrule
+\end{tabular}
