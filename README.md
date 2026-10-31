@@ -1,92 +1,201 @@
-# Spatial Scan Surrogate
+# A Learned Extreme-Value Surrogate for Spatial Scan Significance
 
-This repository builds and evaluates a structured surrogate for spatial scan statistics. The surrogate predicts each dataset's Gumbel location and scale for the null-maximum distribution of the spatial scan statistic from dataset-level features, then computes window p-values by formula. This replaces repeated null simulation for each window with a fitted dataset-level distribution while retaining per-window p-value estimates.
+Spatial scan statistics identify unusually concentrated geographic counts, but estimating the p-value of the most likely cluster conventionally requires Monte Carlo null replicates. This project predicts the location and scale of a Gumbel approximation to the null distribution of the maximum log-likelihood ratio from seven dataset-level features. At inference time, the predicted Gumbel parameters provide a p-value without generating new null replicates.
 
-## Repository layout
+## Key results
 
-- `config/`: dataset and scan settings.
-- `data/raw/`: local CDC WONDER exports; not committed.
-- `data/processed/`: prepared county data, scan windows, and saved null-maximum distributions.
-- `data/synth/`: generated synthetic datasets and metadata.
-- `data/train/`: assembled model-training tables.
-- `src/`: data preparation, scan, simulation, modeling, evaluation, reporting, figure, and table scripts.
-- `results/tables/`: CSV metrics and intermediate summaries.
-- `results/tables_tex/`: LaTeX tables.
-- `results/figures/paper/`: paper figures as PDF and PNG.
-- `legacy_scripts/`: the preserved single-dataset implementation.
+Reported paper results:
 
-## Data
+- On the 90-dataset synthetic test split, probability-band MAE was 0.0035 for Gumbel-999, 0.0052 for the XGBoost surrogate, 0.0054 for the ridge surrogate, 0.0070 for Gumbel-99, and 0.0114 for MC-99.
+- On mesothelioma, pneumoconioses, and ALS, the surrogate hard-subset F1 scores ranged from 0.98 to 0.9997 against an independent high-replicate reference.
+- Across about 2,000 null datasets, Type I error at α = 0.05 was 4.70% for XGBoost and 4.55% for ridge.
+- The reported time to obtain the null distribution was about 139 seconds with MC-999 and 0.037 seconds with the surrogate, excluding the shared likelihood-ratio scan.
 
-The three CDC WONDER exports are not committed. Download them from CDC WONDER using these settings for each export:
+The surrogate does not beat Gumbel-999 in general and trails it on mesothelioma. It is intended to replace low-replicate testing, not high-precision testing. Scale (β) prediction has negative R² on the test data.
 
-- Underlying Cause of Death, 1999–2020.
-- Group by County only.
-- Show totals, show zero values, and show suppressed values.
-- Use ICD-10 codes C45, J60–J64, and G12.2.
-- Export as tab-delimited text.
+## Method
 
-Save the files with these exact names:
+**Offline:** `src/synth.py` generates 450 synthetic datasets using U.S. county geometry: regional dataset IDs 0–399 and national IDs 5000–5049. The saved split has 315 training, 45 validation, and 90 test datasets, split by dataset rather than by window. The scan uses Monte Carlo null replicates to produce maximum-LLR samples; `src/train_compare.py` fits Gumbel parameters to those samples and trains ridge and XGBoost regressors to predict the parameters. The seven dataset-level features are:
 
-- `data/raw/mesothelioma.txt.tsv`
-- `data/raw/pneumoconioses.txt.tsv`
-- `data/raw/als.txt.tsv`
+1. Total cases (`N`)
+2. Number of counties (`n_counties`)
+3. Number of candidate windows (`n_windows`)
+4. Total population (`total_pop`)
+5. Population Gini coefficient (`pop_gini`)
+6. Largest-county population share (`max_pop_share`)
+7. Fraction of counties with expected count below one (`frac_counties_mu_below_1`)
 
-## Install
+The model uses log transforms for `N`, `n_windows`, and `total_pop`.
 
-Use Python 3.10 or newer, create and activate a virtual environment, then install the dependencies:
+**Online:** scan the observed counts to obtain the maximum LLR, Λ, calculate the seven features, and predict μ and β. The Gumbel survival probability is
 
 ```text
+p = 1 - exp(-exp(-(Λ - μ) / β))
+```
+
+The observed scan is still required; the surrogate removes the need to generate a new null simulation at inference time.
+
+## Repository structure
+
+```text
+config/                 Dataset definitions and scan settings.
+data/external/          County centroid reference data.
+data/legacy/            Preserved inputs and intermediate files from the earlier implementation.
+data/processed/         Prepared county files, observed scan windows, and null maxima.
+data/raw/               CDC WONDER tab-delimited exports used by data preparation.
+data/synth/              Synthetic window samples, null maxima, and metadata.
+data/synth_pilot/        Pilot synthetic data and metadata.
+data/train/              Assembled real and synthetic training tables.
+legacy_scripts/         Earlier single-dataset implementation and its app, modeling, scan, and figure scripts.
+results/figures/        Figures, including the paper-ready outputs in `paper/`.
+results/tables/         CSV result tables and some generated LaTeX table fragments.
+results/tables1/        Additional CSV result-table snapshot present in this repository.
+results/tables_tex/     LaTeX table fragments generated by `src/make_tables_tex.py`.
+results/split.json      Saved train, validation, and test dataset IDs.
+src/                    Current data, scan, modeling, evaluation, and reporting scripts.
+```
+
+## Installation
+
+Install the dependencies listed in `requirements.txt` from the repository root:
+
+```powershell
 python -m venv .venv
-.venv\Scripts\activate
+.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 ```
 
-On macOS or Linux, activate the environment with `source .venv/bin/activate` instead. Run commands from the repository root. For commands that accept `--workers`, replace `W` with the number of worker processes appropriate for the machine.
+Python 3.14.7 was used for the paper. `requirements.txt` lists `joblib`, `matplotlib`, `numpy`, `pandas`, `scikit-learn`, `scipy`, and `xgboost`; it does not pin package versions.
 
-## Full run order
+## Usage
 
-Run these commands in order. Times are rough wall-clock estimates and depend heavily on CPU speed, memory, and the selected worker count; the simulation and scan steps are the longest.
+Run commands from the repository root. The synthetic and null-calibration commands require a positive worker count; the examples below use four workers.
 
-1. Prepare the CDC data: `python src/data_prep.py --all` (about 1–5 minutes).
-2. Calculate observed scans and null distributions: `python src/run_scan.py --all` (about 10–60 minutes).
-3. Validate scan calculations: `python src/validate_scan.py` (about 1–5 minutes).
-4. Generate 400 regional synthetic datasets: `python src/synth.py --count 400 --workers W --start 0` (about 2–12 hours).
-5. Generate 50 national synthetic datasets: `python src/synth.py --count 50 --workers W --start 5000 --national` (about 1–4 hours).
-6. Assemble training tables: `python src/build_table.py` (about 5–30 minutes).
-7. Train and compare full models: `python src/train_compare.py --full` (about 30 minutes–4 hours).
-8. Benchmark computational cost: `python src/benchmark_cost.py` (about 5–30 minutes).
-9. Calibrate null p-values: `python src/null_calibration.py --count 2000 --workers W --mc99-count 300` (about 1–6 hours).
-10. Run the 9,999-replicate reference scan for each dataset (about 1–4 hours each):
+1. Prepare the configured CDC datasets. The raw files must be present at the paths in `config/datasets.json` (`data/raw/mesothelioma.txt.tsv`, `data/raw/pneumoconioses.txt.tsv`, and `data/raw/als.txt.tsv`).
 
-    - `python src/run_scan.py --name mesothelioma --replicates 9999 --seed 2026 --tag ref`
-    - `python src/run_scan.py --name pneumoconioses --replicates 9999 --seed 2026 --tag ref`
-    - `python src/run_scan.py --name als --replicates 9999 --seed 2026 --tag ref`
+   ```powershell
+   python src/data_prep.py --all
+   ```
 
-11. Evaluate against the reference: `python src/eval_reference.py` (about 5–30 minutes).
-12. Print result summaries: `python src/summarize.py` (under 1 minute).
-13. Generate figures: `python src/make_figures.py --real-source reference` (about 1–5 minutes).
-14. Generate LaTeX tables: `python src/make_tables_tex.py --real-source reference` (about 1–5 minutes).
+2. Generate the 400 regional synthetic datasets (IDs 0–399), then the 50 national datasets (IDs 5000–5049). Both commands use the scan settings in `config/scan.json`.
 
-The options above match the argument definitions in the corresponding scripts. `run_scan.py --name` accepts one dataset name, so run it once for each of the three configured datasets. `validate_scan.py`, `build_table.py`, `benchmark_cost.py`, `eval_reference.py`, and `summarize.py` take no command-line options.
+   ```powershell
+   python src/synth.py --count 400 --workers 4 --start 0
+   python src/synth.py --count 50 --workers 4 --start 5000 --national
+   ```
 
-## Results
+   Dataset metadata is written to `data/synth/meta.jsonl`, with per-dataset records under `data/synth/meta_parts/`.
 
-`results/tables/` contains:
+3. Run the observed scan and 999-replicate null simulation for all configured diseases. The replicate count, population cap, and seed come from `config/scan.json`.
 
-- `baseline_repeats.csv`
-- `cost.csv` and `cost_by_n.csv`
-- `dataset_metrics.csv`
-- `gumbel_regression_quality.csv` and `gumbel_tuning.csv`
-- `learning_curve.csv`
-- `null_calibration.csv` and `null_calibration_summary.csv`
-- `paired_bootstrap.csv`
-- `real_all_windows.csv` and `real_vs_reference.csv`
-- `tuning.csv`
-- `type1_power.csv`
-- `window_metrics.csv`
+   ```powershell
+   python src/run_scan.py --all
+   ```
 
-`results/tables_tex/` contains `cost_break_even.tex`, `null_calibration.tex`, `real_hard_comparison.tex`, and `synthetic_test_comparison.tex`.
+4. Assemble the model tables from the synthetic windows and configured real datasets.
 
-`results/figures/paper/` contains PDF and PNG versions of `fig_break_even`, `fig_clusters`, `fig_learning_curve`, `fig_method_comparison`, `fig_null_calibration`, `fig_pred_vs_true`, `fig_real_hard_f1`, and `fig_runtime`.
+   ```powershell
+   python src/build_table.py
+   ```
 
-The original single-dataset version is preserved in Git tag `v0-single-dataset` and in `legacy_scripts/`.
+5. Train and compare models using the full dataset-level split.
+
+   ```powershell
+   python src/train_compare.py --full
+   ```
+
+   This writes the saved split to `results/split.json` and produces models, predictions, and metric tables under `results/`.
+
+6. Evaluate null calibration on 2,000 synthetic null datasets, using MC-99 for the first 300.
+
+   ```powershell
+   python src/null_calibration.py --count 2000 --workers 4 --mc99-count 300
+   ```
+
+7. Generate 9,999-replicate reference null samples for each configured real dataset. The `ref` tag writes separate files such as `data/processed/mesothelioma_c10_ref_null_max.npy`; the script refuses to overwrite an existing tagged file.
+
+   ```powershell
+   python src/run_scan.py --name mesothelioma --replicates 9999 --seed 2026 --tag ref
+   python src/run_scan.py --name pneumoconioses --replicates 9999 --seed 2026 --tag ref
+   python src/run_scan.py --name als --replicates 9999 --seed 2026 --tag ref
+   ```
+
+8. Evaluate the models against those reference samples.
+
+   ```powershell
+   python src/eval_reference.py
+   ```
+
+9. Run the computational-cost analysis.
+
+   ```powershell
+   python src/benchmark_cost.py
+   ```
+
+10. Generate the LaTeX tables and paper figures using reference-based real-data results.
+
+   ```powershell
+   python src/make_tables_tex.py --real-source reference
+   python src/make_figures.py --real-source reference
+   ```
+
+`src/benchmark_cost.py` reads `results/tables/cost.csv` for the earlier competitor timings before writing its updated cost results. Preserve the existing baseline table when rerunning this analysis.
+
+## Reproducing the paper
+
+The paper identifies Git tag `v1-final-results` as the exact results snapshot. This repository contains result files and generation scripts, but no paper LaTeX source that assigns every generated table file a numbered table label. The verified script/output relationships are:
+
+| Paper item | Generator and output |
+|---|---|
+| Table I, synthetic estimator comparison | `python src/make_tables_tex.py`; writes `results/tables_tex/synthetic_test_comparison.tex` from training/evaluation outputs in `results/tables/` and predictions in `results/predictions/`. |
+| Tables II–III | Their numbered mapping is not specified by the repository's table generator. `src/train_compare.py` writes `results/tables/type1_power.csv`, `results/tables/real_all_windows.csv`, and other supporting metrics; `src/eval_reference.py` writes `results/tables/real_vs_reference.csv`. |
+| Real-data hard-subset comparison (number not verified) | `python src/make_tables_tex.py --real-source reference`; writes `results/tables_tex/real_hard_comparison.tex` using `results/tables/real_vs_reference.csv`. |
+| Table IV, null calibration | `python src/make_tables_tex.py`; writes `results/tables_tex/null_calibration.tex` using `results/tables/null_calibration_summary.csv`. The inputs are produced by `src/null_calibration.py`. |
+| Table V, cost and break-even | `python src/make_tables_tex.py`; writes `results/tables_tex/cost_break_even.tex` using `results/tables/cost.csv` and `results/tables/cost_by_n.csv`, produced by `src/benchmark_cost.py`. |
+| Fig. 3, selected clusters | `python src/make_figures.py --real-source reference`; writes `results/figures/paper/fig_clusters.pdf` and `.png`. |
+| Fig. 4, method comparison | Same command; writes `fig_method_comparison.pdf` and `.png` in `results/figures/paper/`. |
+| Fig. 5, predicted versus true p-values | Same command; writes `fig_pred_vs_true.pdf` and `.png` in `results/figures/paper/`. |
+| Fig. 6, learning curve | Same command; writes `fig_learning_curve.pdf` and `.png` in `results/figures/paper/`. |
+| Fig. 7, real-data hard-subset F1 | Same command; writes `fig_real_hard_f1.pdf` and `.png` in `results/figures/paper/`. |
+| Fig. 8, null calibration | Same command; writes `fig_null_calibration.pdf` and `.png` in `results/figures/paper/`. |
+| Fig. 9, computation cost and break-even | Same command; writes `fig_runtime.pdf`, `fig_break_even.pdf`, and their PNG versions in `results/figures/paper/`. |
+
+Other generated paper figures are also saved in `results/figures/paper/`. The table and figure commands expect the preceding pipeline outputs to exist.
+
+## Data
+
+The configured disease datasets are county-level mortality counts from [CDC WONDER](https://wonder.cdc.gov/controller/datarequest/D76). The configured raw export paths are listed in `config/datasets.json`. Use of CDC WONDER data is subject to CDC WONDER's terms.
+
+CDC suppresses small county counts, which cannot be recovered from the source export. `src/data_prep.py` produces three versions of each prepared county dataset in `data/processed/`:
+
+- `primary`: allocates the residual national count among suppressed counties in proportion to county population, constrained to 1–9 deaths per suppressed county. If the residual cannot be allocated under those constraints, the code falls back to the national rate, rounded and clipped to 1–9.
+- `zero`: assigns zero deaths to suppressed counties.
+- `five`: assigns five deaths to suppressed counties.
+
+The synthetic generator uses the county geometry and populations from the prepared primary dataset and the centroid reference file `data/external/census_county_centroids.csv`. Per-dataset metadata is saved under `data/synth/meta_parts/` and merged into `data/synth/meta.jsonl`. The model split is saved separately in `results/split.json`.
+
+## Limitations
+
+- Suppressed county counts are imputed, and results may depend on the imputation choice.
+- The synthetic geometry and real-data evaluation use U.S. counties; transfer to other geographies has not been established.
+- The implemented scan uses circular windows and a Poisson model.
+- The surrogate does not beat Gumbel-999 in general.
+- Predicted Gumbel scale (β) has weak accuracy, including negative test-set R² in the reported experiment.
+- The real-data reference is a high-replicate estimate, not analytical truth.
+- Detected clusters are statistical signals and do not establish causation.
+
+## Citation
+
+```bibtex
+@unpublished{shah2026spatialscan,
+  author       = {Kushal Shah},
+  title        = {A Learned Extreme-Value Surrogate for Spatial Scan Significance},
+  institution  = {Vellore Institute of Technology (VIT), Vellore, India},
+  year         = {2026},
+  note         = {Under review}
+}
+```
+
+## License
+
+No `LICENSE` file is present in the repository. Choose a license before distributing or reusing this project.
